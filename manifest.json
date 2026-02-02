@@ -1,0 +1,18 @@
+{
+  "name": "Bookmarker",
+  "short_name": "Bookmarker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "description": "A modern, liquid-glass style bookmark manager that stores your links locally.",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
