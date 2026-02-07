@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Moon, Sun, BookMarked, LayoutGrid, ArrowUpDown, ChevronDown, Settings, Download, Upload, Trash2, X, AlertTriangle, WifiOff, Smartphone } from 'lucide-react';
+import { Search, Plus, Moon, Sun, BookMarked, LayoutGrid, ArrowUpDown, ChevronDown, Settings, Download, Upload, Trash2, X, AlertTriangle, WifiOff, Smartphone, Home, ChevronRight } from 'lucide-react';
 import { 
   DndContext, 
   closestCenter, 
@@ -48,6 +48,7 @@ function App() {
   const [theme, setTheme] = useLocalStorage<Theme>('bookmarker-theme', 'dark');
   const [bookmarks, setBookmarks] = useLocalStorage<Bookmark[]>('bookmarker-data', []);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All Bookmarks');
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,8 +75,7 @@ function App() {
       },
     }),
     useSensor(TouchSensor, {
-        // Press delay for touch to avoid conflict with scroll, 
-        // though we use a handle, this adds safety.
+        // Press delay for touch to avoid conflict with scroll
         activationConstraint: {
             delay: 150,
             tolerance: 5,
@@ -138,12 +138,15 @@ function App() {
 
   // Apply theme to body
   useEffect(() => {
+    const root = document.documentElement;
     if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.body.style.backgroundColor = '#000000';
+      root.classList.add('dark');
+      root.style.setProperty('color-scheme', 'dark');
+      document.body.style.backgroundColor = '#1A1C1E'; // M3 Dark Surface
     } else {
-      document.documentElement.classList.remove('dark');
-      document.body.style.backgroundColor = '#f3f4f6';
+      root.classList.remove('dark');
+      root.style.setProperty('color-scheme', 'light');
+      document.body.style.backgroundColor = '#FDFCFF'; // M3 Light Surface
     }
   }, [theme]);
 
@@ -174,6 +177,7 @@ function App() {
       const newBookmark: Bookmark = {
         ...bookmarkData,
         id: crypto.randomUUID(),
+        parentId: currentFolderId, // New items go to current folder
         createdAt: Date.now(),
       };
       setBookmarks(prev => [newBookmark, ...prev]);
@@ -188,10 +192,46 @@ function App() {
 
   const confirmDelete = () => {
     if (itemToDelete) {
-      setBookmarks(prev => prev.filter(b => b.id !== itemToDelete));
+      // Recursively find all children IDs to delete
+      const idsToDelete = new Set<string>();
+      const findChildren = (parentId: string) => {
+        idsToDelete.add(parentId);
+        bookmarks
+          .filter(b => b.parentId === parentId)
+          .forEach(child => findChildren(child.id));
+      };
+      
+      findChildren(itemToDelete);
+      
+      setBookmarks(prev => prev.filter(b => !idsToDelete.has(b.id)));
       setItemToDelete(null);
     }
   };
+
+  const handleNavigate = (folderId: string) => {
+    setCurrentFolderId(folderId);
+    setSearchQuery(''); // Clear search on navigation
+    setSelectedCategory('All Bookmarks'); // Reset category on navigation
+  };
+
+  const handleNavigateUp = (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+  };
+
+  const breadcrumbs = useMemo(() => {
+    const path = [];
+    let currentId = currentFolderId;
+    while (currentId) {
+      const folder = bookmarks.find(b => b.id === currentId);
+      if (folder) {
+        path.unshift({ id: folder.id, title: folder.title });
+        currentId = folder.parentId || null;
+      } else {
+        break;
+      }
+    }
+    return path;
+  }, [currentFolderId, bookmarks]);
 
   const handleExportData = () => {
     const dataStr = JSON.stringify(bookmarks, null, 2);
@@ -217,18 +257,19 @@ function App() {
           try {
             const parsed = JSON.parse(e.target.result as string);
             if (Array.isArray(parsed)) {
-              const isValid = parsed.every(b => b.id && b.url && typeof b.createdAt === 'number');
+              // Basic validation - check if objects have id and title
+              const isValid = parsed.every(b => b.id && b.title);
               if (isValid) {
-                if (confirm(`Found ${parsed.length} bookmarks. This will merge them with your current ${bookmarks.length} bookmarks. Continue?`)) {
+                if (confirm(`Found ${parsed.length} items. This will merge them with your current ${bookmarks.length} items. Continue?`)) {
                    const currentIds = new Set(bookmarks.map(b => b.id));
                    const newBookmarks = parsed.filter(b => !currentIds.has(b.id));
                    const updatedBookmarks = [...bookmarks, ...newBookmarks];
                    setBookmarks(updatedBookmarks);
-                   alert(`Successfully imported ${newBookmarks.length} new bookmarks.`);
+                   alert(`Successfully imported ${newBookmarks.length} new items.`);
                    setIsSettingsOpen(false);
                 }
               } else {
-                alert("Invalid file format. Please upload a valid Bookmarker JSON backup.");
+                alert("Invalid file format.");
               }
             } else {
               alert("Invalid JSON format. Expected an array of bookmarks.");
@@ -254,19 +295,41 @@ function App() {
   
   const filteredBookmarks = bookmarks
     .filter(bookmark => {
-      const matchesCategory = selectedCategory === 'All Bookmarks' || bookmark.category === selectedCategory;
-      const matchesSearch = 
-        bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        bookmark.domain.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
+      // 1. Search (Global) overrides folder view
+      if (searchQuery) {
+        return (
+          bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (bookmark.domain || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+
+      // 2. Folder Hierarchy
+      const parentMatch = (bookmark.parentId || null) === currentFolderId;
+      if (!parentMatch) return false;
+
+      // 3. Category Filter
+      if (selectedCategory !== 'All Bookmarks') {
+        if (bookmark.type === 'folder') return false; // Hide folders in filtered views
+        return bookmark.category === selectedCategory;
+      }
+      
+      return true;
     })
     .sort((a, b) => {
+      // Always keep folders on top if custom sort isn't active
+      if (sortOption !== 'custom') {
+        const aIsFolder = a.type === 'folder';
+        const bIsFolder = b.type === 'folder';
+        if (aIsFolder && !bIsFolder) return -1;
+        if (!aIsFolder && bIsFolder) return 1;
+      }
+
       switch (sortOption) {
         case 'newest': return b.createdAt - a.createdAt;
         case 'oldest': return a.createdAt - b.createdAt;
         case 'a-z': return a.title.localeCompare(b.title);
         case 'z-a': return b.title.localeCompare(a.title);
-        case 'domain': return a.domain.localeCompare(b.domain);
+        case 'domain': return (a.domain || '').localeCompare(b.domain || '');
         case 'custom': return 0; // Respect array order
         default: return 0;
       }
@@ -293,7 +356,6 @@ function App() {
       const oldIndex = items.findIndex((i) => i.id === active.id);
       const newIndex = items.findIndex((i) => i.id === over.id);
       
-      // We use the global index to reorder the main state
       return arrayMove(items, oldIndex, newIndex);
     });
   };
@@ -301,184 +363,215 @@ function App() {
   const activeBookmark = activeId ? bookmarks.find(b => b.id === activeId) : null;
 
   return (
-    <div className={`min-h-screen text-gray-800 dark:text-gray-100 overflow-x-hidden selection:bg-indigo-500 selection:text-white`}>
+    <div className={`h-[100dvh] w-full flex flex-col text-gray-900 dark:text-gray-100 overflow-hidden bg-m3-surface-light dark:bg-m3-surface-dark transition-colors duration-300`}>
       
-      {/* Offline Banner */}
+      {/* Offline Banner - Material Style */}
       <AnimatePresence>
         {!isOnline && (
           <motion.div 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold text-center overflow-hidden z-50 fixed top-0 w-full"
+            className="flex-none bg-red-600 text-white text-sm font-medium text-center overflow-hidden z-50 w-full shadow-md"
           >
-            <div className="py-1 flex items-center justify-center gap-2">
-              <WifiOff size={14} />
+            <div className="py-2 flex items-center justify-center gap-2">
+              <WifiOff size={16} />
               <span>You are offline. App is running in local mode.</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Liquid Background Blobs */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/20 blur-[120px] animate-pulse" />
-        <div className="absolute top-[20%] right-[-5%] w-[30%] h-[30%] rounded-full bg-indigo-500/20 blur-[100px] animate-pulse delay-700" />
-        <div className="absolute bottom-[-10%] left-[20%] w-[35%] h-[35%] rounded-full bg-blue-500/20 blur-[120px] animate-pulse delay-1000" />
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 relative mt-2">
-        
-        {/* Header */}
-        <header className="flex flex-col gap-3 sm:gap-6 mb-4 sm:mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-500/30">
-                <BookMarked className="text-white w-6 h-6" />
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
-                Bookmarker
-              </h1>
+      {/* Fixed Header Section - Material Top App Bar style */}
+      <div className="flex-none z-30 flex flex-col px-4 pt-4 pb-2 bg-m3-surface-light dark:bg-m3-surface-dark">
+        {/* Top Row: Logo & Settings */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-indigo-600 rounded-xl shadow-sm text-white">
+              <BookMarked className="w-5 h-5" />
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleTheme}
-                className="hidden md:flex p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10 transition-all shadow-sm items-center justify-center"
-              >
-                {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
-              </button>
-
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-3 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md border border-gray-200/50 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10 transition-all shadow-sm"
-              >
-                <Settings className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-              </button>
-            </div>
+            <h1 className="text-2xl font-normal tracking-tight text-gray-900 dark:text-white">
+              Bookmarker
+            </h1>
           </div>
 
-          <div className="flex flex-col sm:flex-row md:items-center gap-2 sm:gap-3 w-full justify-between">
-             <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto flex-1">
-                <div className="relative group min-w-[130px] sm:min-w-[160px]">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <ArrowUpDown className="h-4 w-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                  </div>
-                  <select
-                    value={sortOption}
-                    onChange={(e) => setSortOption(e.target.value as SortOption)}
-                    className="
-                      block w-full pl-9 pr-8 py-3 appearance-none
-                      bg-white/50 dark:bg-white/5 
-                      backdrop-blur-md 
-                      border border-gray-200/50 dark:border-white/10 
-                      rounded-2xl 
-                      focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 
-                      text-base sm:text-sm font-medium transition-all shadow-sm
-                      text-gray-700 dark:text-gray-200
-                      cursor-pointer outline-none
-                      truncate
-                    "
-                  >
-                    <option value="custom" className="bg-white dark:bg-gray-900">Custom Order</option>
-                    <option value="newest" className="bg-white dark:bg-gray-900">Newest</option>
-                    <option value="oldest" className="bg-white dark:bg-gray-900">Oldest</option>
-                    <option value="a-z" className="bg-white dark:bg-gray-900">A-Z</option>
-                    <option value="z-a" className="bg-white dark:bg-gray-900">Z-A</option>
-                    <option value="domain" className="bg-white dark:bg-gray-900">Domain</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                  </div>
-                </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              {theme === 'dark' ? <Sun className="w-6 h-6 text-yellow-500" /> : <Moon className="w-6 h-6 text-indigo-600" />}
+            </button>
 
-                <div className="relative flex-grow group">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="
-                      block w-full pl-10 pr-3 py-3 
-                      bg-white/50 dark:bg-white/5 
-                      backdrop-blur-md 
-                      border border-gray-200/50 dark:border-white/10 
-                      rounded-2xl 
-                      focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 
-                      placeholder-gray-500 dark:placeholder-gray-400 
-                      text-base sm:text-sm transition-all shadow-sm
-                      dark:text-white
-                    "
-                  />
-                </div>
-             </div>
-          </div>
-        </header>
-
-        <div className="sticky top-4 z-30 mb-4 sm:mb-8 space-y-4">
-          <div className="flex items-center justify-between backdrop-blur-xl bg-white/30 dark:bg-black/30 p-2 rounded-[20px] border border-white/20 dark:border-white/5 shadow-lg">
-            <div className="flex-grow overflow-hidden">
-               <CategoryTabs 
-                 categories={CATEGORIES} 
-                 selectedCategory={selectedCategory} 
-                 onSelectCategory={setSelectedCategory} 
-               />
-            </div>
-            <div className="pl-2 border-l border-gray-200/50 dark:border-white/10 hidden md:block">
-               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={openAddModal}
-                className="
-                  flex items-center space-x-2 px-6 py-2.5 rounded-2xl
-                  bg-indigo-600 text-white font-medium
-                  shadow-lg shadow-indigo-500/30
-                  hover:bg-indigo-700 transition-colors
-                "
-              >
-                <Plus size={18} />
-                <span>Add New</span>
-              </motion.button>
-            </div>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              <Settings className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+            </button>
           </div>
         </div>
 
-        <motion.button
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          onClick={openAddModal}
-          className="md:hidden fixed bottom-6 right-6 z-40 p-4 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/40"
-        >
-          <Plus size={24} />
-        </motion.button>
-
-        {/* Bookmarks Grid with DnD */}
-        <div className="min-h-[50vh] pb-24 sm:pb-8">
-          {bookmarks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="w-20 h-20 bg-indigo-100/10 rounded-full flex items-center justify-center mb-4">
-                <LayoutGrid className="w-10 h-10 text-indigo-400 opacity-50" />
+        {/* Second Row: Search & Sort - Material inputs */}
+        <div className="flex items-center gap-3 w-full mb-4">
+           {/* Sort Dropdown */}
+           <div className="relative min-w-[120px]">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <ArrowUpDown className="h-4 w-4 text-gray-500" />
               </div>
-              <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">No bookmarks yet</h3>
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+                className="
+                  block w-full pl-9 pr-8 py-3 appearance-none
+                  bg-m3-surfaceContainer-light dark:bg-m3-surfaceContainer-dark
+                  border border-gray-300 dark:border-gray-700
+                  rounded-full
+                  focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  text-sm font-medium transition-all
+                  text-gray-700 dark:text-gray-200
+                  cursor-pointer outline-none
+                  truncate
+                "
+              >
+                <option value="custom" className="bg-white dark:bg-gray-800">Custom</option>
+                <option value="newest" className="bg-white dark:bg-gray-800">Newest</option>
+                <option value="oldest" className="bg-white dark:bg-gray-800">Oldest</option>
+                <option value="a-z" className="bg-white dark:bg-gray-800">A-Z</option>
+                <option value="z-a" className="bg-white dark:bg-gray-800">Z-A</option>
+                <option value="domain" className="bg-white dark:bg-gray-800">Domain</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              </div>
+           </div>
+
+           {/* Search Input */}
+           <div className="relative flex-grow">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-500" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="
+                  block w-full pl-10 pr-4 py-3 
+                  bg-m3-surfaceContainer-light dark:bg-m3-surfaceContainer-dark
+                  border border-gray-300 dark:border-gray-700
+                  rounded-full
+                  focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                  placeholder-gray-500 dark:placeholder-gray-400 
+                  text-sm transition-all
+                  text-gray-900 dark:text-white
+                "
+              />
+           </div>
+        </div>
+
+        {/* Breadcrumbs - Only show when inside a folder and not searching */}
+        {!searchQuery && currentFolderId && (
+          <nav className="flex items-center gap-1 mb-4 overflow-x-auto no-scrollbar" aria-label="Breadcrumb">
+             <button 
+                onClick={() => handleNavigateUp(null)}
+                className="flex items-center justify-center p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                title="Go to Home"
+             >
+               <Home size={20} />
+             </button>
+             
+             {breadcrumbs.map((crumb, index) => {
+                const isLast = index === breadcrumbs.length - 1;
+                return (
+                <div key={crumb.id} className="flex items-center flex-shrink-0">
+                  <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 mx-1" />
+                  <button
+                    onClick={() => !isLast && handleNavigateUp(crumb.id)}
+                    disabled={isLast}
+                    className={`
+                      text-sm px-4 py-1.5 rounded-full transition-colors whitespace-nowrap font-medium border
+                      ${isLast 
+                        ? 'bg-indigo-100 text-indigo-900 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800 cursor-default shadow-sm' 
+                        : 'bg-transparent text-gray-600 border-gray-300 dark:text-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'}
+                    `}
+                  >
+                    {crumb.title}
+                  </button>
+                </div>
+             )})}
+          </nav>
+        )}
+
+        {/* Third Row: Categories - Scrollable Chips */}
+        <div className="flex items-center justify-between pb-2">
+           <div className="flex-grow overflow-hidden">
+             <CategoryTabs 
+               categories={CATEGORIES} 
+               selectedCategory={selectedCategory} 
+               onSelectCategory={setSelectedCategory} 
+             />
+           </div>
+           
+           {/* Desktop Add Button (Text/Icon style) */}
+           <div className="pl-2 hidden md:block">
+              <motion.button
+               whileHover={{ scale: 1.02 }}
+               whileTap={{ scale: 0.95 }}
+               onClick={openAddModal}
+               className="
+                 flex items-center space-x-2 px-5 py-2.5 rounded-full
+                 bg-indigo-600 dark:bg-indigo-300 
+                 text-white dark:text-indigo-900 
+                 font-medium text-sm
+                 hover:bg-indigo-700 dark:hover:bg-indigo-200 
+                 transition-colors shadow-sm
+               "
+             >
+               <Plus size={18} />
+               <span>New</span>
+             </motion.button>
+           </div>
+        </div>
+      </div>
+
+      {/* Scrollable Main Content */}
+      <div 
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:px-6 lg:px-8 pb-28 sm:pb-8 scroll-smooth"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+         <div className="max-w-7xl mx-auto min-h-full">
+            {bookmarks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center mt-10">
+              <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mb-4">
+                <LayoutGrid className="w-10 h-10 text-indigo-400 opacity-75" />
+              </div>
+              <h3 className="text-xl font-normal text-gray-900 dark:text-white mb-2">No bookmarks yet</h3>
               <p className="text-gray-500 dark:text-gray-400 max-w-sm">
                 Start building your collection by adding your first bookmark.
               </p>
               <button 
                 onClick={openAddModal}
-                className="mt-6 text-indigo-500 hover:text-indigo-400 font-medium"
+                className="mt-6 text-indigo-600 dark:text-indigo-300 font-medium hover:underline"
               >
-                + Add your first bookmark
+                Create Bookmark
               </button>
             </div>
           ) : filteredBookmarks.length === 0 ? (
-             <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Search className="w-12 h-12 text-gray-400 mb-4 opacity-50" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">No matches found</h3>
-              <p className="text-gray-500 dark:text-gray-400">
-                Try adjusting your search or category filter.
+             <div className="flex flex-col items-center justify-center h-64 text-center mt-10">
+              {searchQuery ? (
+                 <>
+                   <Search className="w-12 h-12 text-gray-400 mb-4 opacity-75" />
+                   <h3 className="text-lg font-normal text-gray-900 dark:text-white">No matches found</h3>
+                 </>
+              ) : (
+                <>
+                  <LayoutGrid className="w-12 h-12 text-gray-400 mb-4 opacity-75" />
+                  <h3 className="text-lg font-normal text-gray-900 dark:text-white">Folder is empty</h3>
+                </>
+              )}
+              <p className="text-gray-500 dark:text-gray-400 mt-2">
+                {searchQuery ? "Try adjusting your search." : "Add a bookmark or folder here."}
               </p>
             </div>
           ) : (
@@ -493,8 +586,8 @@ function App() {
                 strategy={rectSortingStrategy}
               >
                 <motion.div 
-                  layout={!activeId} // Disable framer-motion layout during drag to prevent conflict
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+                  layout={!activeId}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                 >
                   <AnimatePresence>
                     {filteredBookmarks.map((bookmark) => (
@@ -503,13 +596,13 @@ function App() {
                         bookmark={bookmark} 
                         onDelete={handleDeleteClick} 
                         onEdit={openEditModal}
+                        onNavigate={handleNavigate}
                       />
                     ))}
                   </AnimatePresence>
                 </motion.div>
               </SortableContext>
 
-              {/* Drag Overlay for smooth visuals */}
               <DragOverlay adjustScale={true}>
                 {activeBookmark ? (
                   <div className="opacity-90">
@@ -517,6 +610,7 @@ function App() {
                         bookmark={activeBookmark}
                         onDelete={() => {}}
                         onEdit={() => {}}
+                        onNavigate={() => {}}
                         isDragOverlay
                       />
                   </div>
@@ -524,8 +618,27 @@ function App() {
               </DragOverlay>
             </DndContext>
           )}
-        </div>
+         </div>
       </div>
+
+      {/* Material FAB */}
+      <motion.button
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={openAddModal}
+        className="
+          md:hidden fixed bottom-6 right-6 z-40 
+          w-14 h-14 flex items-center justify-center
+          bg-indigo-600 dark:bg-indigo-300 
+          text-white dark:text-indigo-900 
+          rounded-[16px] shadow-lg hover:shadow-xl
+          transition-all
+        "
+      >
+        <Plus size={24} />
+      </motion.button>
 
       <AddBookmarkForm 
         isOpen={isModalOpen} 
@@ -538,6 +651,7 @@ function App() {
         categories={CATEGORIES}
       />
 
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {itemToDelete && (
           <>
@@ -546,32 +660,32 @@ function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setItemToDelete(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              className="fixed inset-0 bg-black/50 z-50"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
-              <div className="pointer-events-auto w-full max-w-sm bg-white/90 dark:bg-gray-900/95 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl rounded-[2rem] p-6 text-center">
+              <div className="pointer-events-auto w-full max-w-xs bg-m3-surfaceContainer-light dark:bg-m3-surfaceContainer-dark rounded-[28px] p-6 text-center shadow-xl">
                 <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
-                  <Trash2 className="w-6 h-6 text-red-600 dark:text-red-500" />
+                  <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Delete Bookmark?</h3>
+                <h3 className="text-xl font-normal text-gray-900 dark:text-white mb-2">Delete Item?</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  Are you sure you want to delete this bookmark? This action cannot be undone.
+                  Are you sure you want to delete this? If it's a folder, all contents will be deleted.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex gap-3 justify-end">
                   <button
                     onClick={() => setItemToDelete(null)}
-                    className="flex-1 py-3 px-4 rounded-xl bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+                    className="px-4 py-2 rounded-full text-indigo-600 dark:text-indigo-300 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmDelete}
-                    className="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 shadow-lg shadow-red-500/30 transition-colors"
+                    className="px-4 py-2 rounded-full bg-red-600 text-white font-medium hover:bg-red-700 transition-colors shadow-sm"
                   >
                     Delete
                   </button>
@@ -582,6 +696,7 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* Settings Modal - Material Dialog */}
       <AnimatePresence>
         {isSettingsOpen && (
           <>
@@ -590,7 +705,7 @@ function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSettingsOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              className="fixed inset-0 bg-black/50 z-40"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -599,14 +714,14 @@ function App() {
               className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
             >
               <div className="pointer-events-auto w-full max-w-sm">
-                <div className="relative overflow-hidden rounded-[2rem] bg-white/90 dark:bg-gray-900/95 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-2xl p-6">
+                <div className="relative overflow-hidden rounded-[28px] bg-m3-surfaceContainer-light dark:bg-m3-surfaceContainer-dark shadow-2xl p-6">
                   
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      <Settings className="w-5 h-5 text-indigo-500" />
+                    <h2 className="text-xl font-normal text-gray-900 dark:text-white flex items-center gap-2">
+                      <Settings className="w-6 h-6 text-indigo-600 dark:text-indigo-300" />
                       Settings
                     </h2>
-                    <button onClick={() => setIsSettingsOpen(false)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors">
+                    <button onClick={() => setIsSettingsOpen(false)} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
                       <X className="w-5 h-5 text-gray-500" />
                     </button>
                   </div>
@@ -616,56 +731,38 @@ function App() {
                     {installPrompt && (
                       <button
                         onClick={handleInstallClick}
-                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 hover:from-indigo-500/20 hover:to-purple-500/20 transition-all group mb-4"
+                        className="w-full flex items-center gap-4 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group mb-4"
                       >
-                         <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md">
-                          <Smartphone size={18} />
+                         <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-200">
+                          <Smartphone size={20} />
                         </div>
                         <div className="text-left">
-                          <p className="font-bold text-gray-900 dark:text-white">Install App</p>
+                          <p className="font-medium text-gray-900 dark:text-white">Install App</p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Add to Home Screen</p>
                         </div>
                       </button>
                     )}
 
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 dark:bg-white/5 border border-gray-100 dark:border-white/5">
-                      <span className="font-medium text-gray-700 dark:text-gray-200">Appearance</span>
-                      <button
-                        onClick={toggleTheme}
-                        className="p-2 rounded-lg bg-white dark:bg-black/20 shadow-sm border border-gray-200 dark:border-white/10"
-                      >
-                        {theme === 'dark' ? <Sun className="w-4 h-4 text-yellow-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
-                      </button>
-                    </div>
-
-                    <div className="h-px bg-gray-200 dark:bg-white/10 my-2" />
-
-                    <div className="space-y-3">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Data Management</p>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1 mb-2">Data</p>
                       
                       <button
                         onClick={handleExportData}
-                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-gray-50/50 dark:bg-white/5 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-gray-100 dark:border-white/5 transition-colors group"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
-                        <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-800 transition-colors">
-                          <Download size={18} />
-                        </div>
+                        <Download size={20} className="text-gray-500 dark:text-gray-400" />
                         <div className="text-left">
-                          <p className="font-medium text-gray-900 dark:text-white">Export Bookmarks</p>
-                          <p className="text-xs text-gray-500">Download backup JSON file</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">Export Bookmarks</p>
                         </div>
                       </button>
 
                       <button
                         onClick={handleImportClick}
-                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-gray-50/50 dark:bg-white/5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-gray-100 dark:border-white/5 transition-colors group"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
-                         <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-800 transition-colors">
-                          <Upload size={18} />
-                        </div>
+                        <Upload size={20} className="text-gray-500 dark:text-gray-400" />
                         <div className="text-left">
-                          <p className="font-medium text-gray-900 dark:text-white">Import Bookmarks</p>
-                          <p className="text-xs text-gray-500">Restore from backup file</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">Import Bookmarks</p>
                         </div>
                         <input 
                           type="file" 
@@ -678,15 +775,10 @@ function App() {
 
                       <button
                         onClick={handleClearAll}
-                        className="w-full flex items-center gap-3 p-4 rounded-xl bg-red-50/50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20 border border-red-100 dark:border-red-900/20 transition-colors group mt-4"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 text-red-600 dark:text-red-400 transition-colors mt-2"
                       >
-                        <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 group-hover:bg-red-200 dark:group-hover:bg-red-800 transition-colors">
-                          <AlertTriangle size={18} />
-                        </div>
-                        <div className="text-left">
-                          <p className="font-medium text-red-700 dark:text-red-400">Clear All Data</p>
-                          <p className="text-xs text-red-500/80">Permanently delete everything</p>
-                        </div>
+                        <Trash2 size={20} />
+                        <p className="text-sm font-medium">Clear All Data</p>
                       </button>
                     </div>
                   </div>

@@ -1,8 +1,10 @@
 export interface Bookmark {
   id: string;
   title: string;
-  url: string;
-  domain: string;
+  url?: string;
+  domain?: string;
+  type?: 'link' | 'folder';
+  parentId?: string | null;
   category: CategoryType;
   createdAt: number;
 }
