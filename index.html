@@ -37,11 +37,11 @@
               m3: {
                 surface: {
                   light: '#FDFCFF',
-                  dark: '#1A1C1E',
+                  dark: '#000000', // Pitch Black
                 },
                 surfaceContainer: {
                   light: '#F3EDF7',
-                  dark: '#242629', // Slightly lighter than background
+                  dark: '#111111', // Deep Dark Grey (OLED Friendly)
                 },
                 primary: {
                   light: '#6750A4',
@@ -114,7 +114,7 @@
       }
       /* Dark mode splash override via JS or media query usually, simple approach here */
       @media (prefers-color-scheme: dark) {
-        #splash-screen { background-color: #1A1C1E; }
+        #splash-screen { background-color: #000000; }
       }
 
       .logo-pulse {

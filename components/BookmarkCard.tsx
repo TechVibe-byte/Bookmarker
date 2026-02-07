@@ -106,7 +106,7 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
         className={`
         relative overflow-hidden rounded-[16px]
         bg-m3-surfaceContainer-light dark:bg-m3-surfaceContainer-dark
-        border border-gray-200 dark:border-gray-700
+        border border-gray-200 dark:border-gray-800
         transition-shadow duration-300
         h-full flex flex-col cursor-pointer
         ${isDragOverlay ? 'shadow-xl' : 'hover:shadow-md shadow-sm'}
@@ -116,34 +116,34 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
           <div className="absolute inset-0 bg-current opacity-0 hover:opacity-[0.08] dark:hover:opacity-[0.08] transition-opacity duration-200 pointer-events-none text-indigo-900 dark:text-indigo-100" />
         )}
         
-        <div className="p-4 flex flex-col h-full z-10 relative">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
+        <div className="p-3 flex flex-col h-full z-10 relative">
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
               {/* Drag Handle */}
               {!isDragOverlay && (
                  <div 
                   {...listeners}
                   onClick={(e) => e.stopPropagation()} 
-                  className="cursor-grab active:cursor-grabbing p-1.5 -ml-2 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+                  className="cursor-grab active:cursor-grabbing p-1 -ml-1.5 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-gray-700 transition-colors"
                   title="Drag to reorder"
                 >
-                  <GripVertical size={20} />
+                  <GripVertical size={16} />
                 </div>
               )}
               
-              <div className={`flex items-center justify-center w-10 h-10 rounded-xl shadow-sm border ${isFolder ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-gray-700 border-gray-100 dark:border-gray-600'}`}>
+              <div className={`flex items-center justify-center w-8 h-8 rounded-lg shadow-sm border ${isFolder ? 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'}`}>
                 {isFolder ? (
-                  <Folder className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  <Folder className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 ) : (
                   !imageError ? (
                     <img 
                       src={getFaviconUrl(bookmark.domain || '')} 
                       alt={bookmark.title}
-                      className="w-6 h-6 object-contain"
+                      className="w-4 h-4 object-contain"
                       onError={() => setImageError(true)}
                     />
                   ) : (
-                    <Globe className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                    <Globe className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   )
                 )}
               </div>
@@ -157,20 +157,20 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={handleShare}
-                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                    className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                     title="Share"
                   >
-                    <Share2 size={18} />
+                    <Share2 size={14} />
                   </motion.button>
 
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={handleCopy}
-                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                    className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                     title={isCopied ? "Copied!" : "Copy Link"}
                   >
-                    {isCopied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
+                    {isCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                   </motion.button>
                 </>
               )}
@@ -183,10 +183,10 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
                   e.stopPropagation();
                   onEdit(bookmark);
                 }}
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 title="Edit"
               >
-                <Edit2 size={18} />
+                <Edit2 size={14} />
               </motion.button>
               
               <motion.button
@@ -197,52 +197,52 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
                   e.stopPropagation();
                   onDelete(bookmark.id);
                 }}
-                className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                className="p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
                 title="Delete"
               >
-                <Trash2 size={18} />
+                <Trash2 size={14} />
               </motion.button>
             </div>
           </div>
 
-          <div className="flex-grow">
-            <h3 className="text-base font-medium text-gray-900 dark:text-gray-50 mb-1 line-clamp-2 leading-tight">
+          <div className="flex-grow min-w-0">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-200 mb-0.5 line-clamp-2 leading-snug">
               {bookmark.title || bookmark.domain}
             </h3>
             {!isFolder && (
               <>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
                     {bookmark.category}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
                   {bookmark.domain}
                 </p>
               </>
             )}
             {isFolder && (
-               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+               <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
                  Folder
                </p>
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+          <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-800 flex justify-end">
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleClick}
               className={`
-                flex items-center space-x-2 px-4 py-2 rounded-full
+                flex items-center space-x-1.5 px-3 py-1.5 rounded-full
                 ${isFolder 
-                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600' 
-                  : 'bg-indigo-600 dark:bg-indigo-300 text-white dark:text-indigo-900 hover:bg-indigo-700 dark:hover:bg-indigo-200'}
-                font-medium text-sm transition-colors shadow-sm
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700' 
+                  : 'bg-indigo-600 dark:bg-indigo-700 text-white dark:text-indigo-100 hover:bg-indigo-700 dark:hover:bg-indigo-600'}
+                font-medium text-xs transition-colors shadow-sm
               `}
             >
-              <span>{isFolder ? 'Open' : 'Visit Site'}</span>
-              {isFolder ? <FolderOpen size={14} /> : <ExternalLink size={14} />}
+              <span>{isFolder ? 'Open' : 'Visit'}</span>
+              {isFolder ? <FolderOpen size={12} /> : <ExternalLink size={12} />}
             </motion.button>
           </div>
         </div>
