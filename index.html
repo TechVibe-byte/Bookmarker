@@ -62,20 +62,21 @@
       }
     </script>
     <style>
-      /* Custom scrollbar for webkit */
+      /* Custom scrollbar for webkit - Liquid Minimalist */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: rgba(156, 163, 175, 0.5);
-        border-radius: 4px;
+        background: rgba(156, 163, 175, 0.3);
+        border-radius: 10px;
+        transition: background 0.2s ease;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: rgba(156, 163, 175, 0.8);
+        background: rgba(156, 163, 175, 0.6);
       }
       
       html, body {
@@ -84,6 +85,7 @@
         overflow: hidden; /* Prevent body scroll, we scroll internal div */
         touch-action: none; /* Disable default touch actions to prevent bounce on body */
         font-family: 'Roboto', sans-serif;
+        scroll-behavior: smooth;
       }
       
       body {

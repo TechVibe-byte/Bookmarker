@@ -396,19 +396,23 @@ function App() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={toggleTheme}
               className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               {theme === 'dark' ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-indigo-600" />}
-            </button>
+            </motion.button>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => setIsSettingsOpen(true)}
               className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               <Settings className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -473,20 +477,24 @@ function App() {
         {/* Breadcrumbs - Only show when inside a folder and not searching */}
         {!searchQuery && currentFolderId && (
           <nav className="flex items-center gap-1 mb-3 overflow-x-auto no-scrollbar" aria-label="Breadcrumb">
-             <button 
+             <motion.button 
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={() => handleNavigateUp(null)}
                 className="flex items-center justify-center p-1.5 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 title="Go to Home"
              >
                <Home size={18} />
-             </button>
+             </motion.button>
              
              {breadcrumbs.map((crumb, index) => {
                 const isLast = index === breadcrumbs.length - 1;
                 return (
                 <div key={crumb.id} className="flex items-center flex-shrink-0">
                   <ChevronRight size={14} className="text-gray-300 dark:text-gray-600 mx-0.5" />
-                  <button
+                  <motion.button
+                    whileHover={{ scale: isLast ? 1 : 1.05 }}
+                    whileTap={{ scale: isLast ? 1 : 0.95 }}
                     onClick={() => !isLast && handleNavigateUp(crumb.id)}
                     disabled={isLast}
                     className={`
@@ -497,7 +505,7 @@ function App() {
                     `}
                   >
                     {crumb.title}
-                  </button>
+                  </motion.button>
                 </div>
              )})}
           </nav>
@@ -516,7 +524,7 @@ function App() {
            {/* Desktop Add Button (Text/Icon style) */}
            <div className="pl-2 hidden md:block">
               <motion.button
-               whileHover={{ scale: 1.02 }}
+               whileHover={{ scale: 1.05 }}
                whileTap={{ scale: 0.95 }}
                onClick={openAddModal}
                className="
@@ -537,7 +545,7 @@ function App() {
 
       {/* Scrollable Main Content */}
       <div 
-        className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:px-6 lg:px-8 pb-20 sm:pb-8 scroll-smooth"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:px-6 lg:px-8 pb-24 sm:pb-8 scroll-smooth"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
          <div className="max-w-7xl mx-auto min-h-full">
@@ -550,12 +558,14 @@ function App() {
               <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">
                 Start building your collection by adding your first bookmark.
               </p>
-              <button 
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={openAddModal}
                 className="mt-4 text-indigo-600 dark:text-indigo-300 font-medium text-sm hover:underline"
               >
                 Create Bookmark
-              </button>
+              </motion.button>
             </div>
           ) : filteredBookmarks.length === 0 ? (
              <div className="flex flex-col items-center justify-center h-64 text-center mt-10">
@@ -677,18 +687,22 @@ function App() {
                   Are you sure you want to delete this? If it's a folder, all contents will be deleted.
                 </p>
                 <div className="flex gap-2 justify-end">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => setItemToDelete(null)}
                     className="px-3 py-1.5 rounded-full text-indigo-600 dark:text-indigo-300 font-medium text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={confirmDelete}
                     className="px-3 py-1.5 rounded-full bg-red-600 text-white font-medium text-sm hover:bg-red-700 transition-colors shadow-sm"
                   >
                     Delete
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
@@ -721,15 +735,22 @@ function App() {
                       <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-300" />
                       Settings
                     </h2>
-                    <button onClick={() => setIsSettingsOpen(false)} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <motion.button 
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setIsSettingsOpen(false)} 
+                      className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    >
                       <X className="w-4 h-4 text-gray-500" />
-                    </button>
+                    </motion.button>
                   </div>
 
                   <div className="space-y-3">
                     {/* Install App Button */}
                     {installPrompt && (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handleInstallClick}
                         className="w-full flex items-center gap-3 p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800 transition-all group mb-3"
                       >
@@ -740,13 +761,15 @@ function App() {
                           <p className="font-medium text-sm text-gray-900 dark:text-white">Install App</p>
                           <p className="text-[10px] text-gray-500 dark:text-gray-400">Add to Home Screen</p>
                         </div>
-                      </button>
+                      </motion.button>
                     )}
 
                     <div className="space-y-2">
                       <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider ml-1 mb-1">Data</p>
                       
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handleExportData}
                         className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
@@ -754,9 +777,11 @@ function App() {
                         <div className="text-left">
                           <p className="text-sm font-medium text-gray-900 dark:text-white">Export Bookmarks</p>
                         </div>
-                      </button>
+                      </motion.button>
 
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handleImportClick}
                         className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
@@ -771,15 +796,17 @@ function App() {
                           className="hidden"
                           accept="application/json"
                         />
-                      </button>
+                      </motion.button>
 
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={handleClearAll}
                         className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 text-red-600 dark:text-red-400 transition-colors mt-1"
                       >
                         <Trash2 size={18} />
                         <p className="text-sm font-medium">Clear All Data</p>
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
 

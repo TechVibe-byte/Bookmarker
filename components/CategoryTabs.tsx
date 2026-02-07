@@ -23,6 +23,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
               <motion.button
                 key={category}
                 onClick={() => onSelectCategory(category)}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className={`
                   relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border

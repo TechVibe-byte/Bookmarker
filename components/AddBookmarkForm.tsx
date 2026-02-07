@@ -144,31 +144,37 @@ const AddBookmarkForm: React.FC<AddBookmarkFormProps> = ({ isOpen, onClose, onSu
                   <h2 className="text-xl font-normal text-gray-900 dark:text-gray-100">
                     {initialData ? 'Edit Item' : 'Add New'}
                   </h2>
-                  <button 
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                     onClick={onClose}
                     className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                   >
                     <X className="text-gray-600 dark:text-gray-300 w-5 h-5" />
-                  </button>
+                  </motion.button>
                 </div>
 
                 {/* Type Toggle */}
                 {!initialData && (
                   <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-full mb-5">
-                    <button 
+                    <motion.button 
                       type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => setType('link')}
                       className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-full text-sm font-medium transition-colors ${type === 'link' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'}`}
                     >
                       <LinkIcon size={14} /> Link
-                    </button>
-                    <button 
+                    </motion.button>
+                    <motion.button 
                       type="button"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => setType('folder')}
                       className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-full text-sm font-medium transition-colors ${type === 'folder' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'}`}
                     >
                       <Folder size={14} /> Folder
-                    </button>
+                    </motion.button>
                   </div>
                 )}
 
@@ -304,15 +310,19 @@ const AddBookmarkForm: React.FC<AddBookmarkFormProps> = ({ isOpen, onClose, onSu
                   )}
 
                   <div className="flex justify-end gap-3 pt-2">
-                    <button
+                    <motion.button
                       type="button"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={onClose}
                       className="px-4 py-2 rounded-full text-indigo-600 dark:text-indigo-300 font-medium text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
                       type="submit"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       disabled={isSubmitting}
                       className="
                         px-5 py-2 rounded-full
@@ -336,7 +346,7 @@ const AddBookmarkForm: React.FC<AddBookmarkFormProps> = ({ isOpen, onClose, onSu
                           <span>{initialData ? 'Update' : 'Save'}</span>
                         </>
                       )}
-                    </button>
+                    </motion.button>
                   </div>
                 </form>
               </div>
