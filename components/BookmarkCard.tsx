@@ -34,7 +34,6 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 50 : 'auto',
-    touchAction: 'none', // Prevents scrolling when dragging via the handle
   };
 
   const copyToClipboard = () => {
@@ -125,6 +124,7 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit,
                   {...listeners}
                   onClick={(e) => e.stopPropagation()} 
                   className="cursor-grab active:cursor-grabbing p-1 -ml-1.5 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-500 dark:hover:bg-gray-700 transition-colors"
+                  style={{ touchAction: 'none' }}
                   title="Drag to reorder"
                 >
                   <GripVertical size={16} />

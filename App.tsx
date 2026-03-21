@@ -77,8 +77,8 @@ function App() {
     useSensor(TouchSensor, {
         // Press delay for touch to avoid conflict with scroll
         activationConstraint: {
-            delay: 150,
-            tolerance: 5,
+            delay: 200,
+            tolerance: 8,
         }
     }),
     useSensor(KeyboardSensor, {
@@ -546,6 +546,7 @@ function App() {
       {/* Scrollable Main Content */}
       <div 
         className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:px-6 lg:px-8 pb-24 sm:pb-8 scroll-smooth scrollbar-stable"
+        style={{ touchAction: 'pan-y' }}
       >
          <div className="max-w-7xl mx-auto min-h-full">
             {bookmarks.length === 0 ? (
