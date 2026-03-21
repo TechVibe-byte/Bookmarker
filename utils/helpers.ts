@@ -123,3 +123,26 @@ export const ensureUrlProtocol = (url: string): string => {
   }
   return url;
 };
+
+export const parseNetscapeBookmarks = (html: string): any[] => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const results: any[] = [];
+  const anchors = doc.querySelectorAll('a');
+  anchors.forEach(a => {
+    const url = a.getAttribute('href') || '';
+    if (!url.startsWith('http')) return;
+    const title = (a.textContent || url).trim();
+    const domain = getDomainFromUrl(url);
+    results.push({
+      title,
+      url,
+      domain,
+      type: 'link',
+      parentId: null,
+      category: getCategoryFromDomain(domain),
+      createdAt: Date.now()
+    });
+  });
+  return results;
+};

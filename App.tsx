@@ -25,6 +25,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import CategoryTabs from './components/CategoryTabs';
 import BookmarkCard from './components/BookmarkCard';
 import AddBookmarkForm from './components/AddBookmarkForm';
+import { parseNetscapeBookmarks } from './utils/helpers';
 
 const CATEGORIES: CategoryType[] = [
   'All Bookmarks',
@@ -249,38 +250,63 @@ function App() {
   };
 
   const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     const fileReader = new FileReader();
-    if (event.target.files && event.target.files[0]) {
-      fileReader.readAsText(event.target.files[0], "UTF-8");
-      fileReader.onload = e => {
-        if (e.target?.result) {
-          try {
-            const parsed = JSON.parse(e.target.result as string);
-            if (Array.isArray(parsed)) {
-              // Basic validation - check if objects have id and title
-              const isValid = parsed.every(b => b.id && b.title);
-              if (isValid) {
-                if (confirm(`Found ${parsed.length} items. This will merge them with your current ${bookmarks.length} items. Continue?`)) {
-                   const currentIds = new Set(bookmarks.map(b => b.id));
-                   const newBookmarks = parsed.filter(b => !currentIds.has(b.id));
-                   const updatedBookmarks = [...bookmarks, ...newBookmarks];
-                   setBookmarks(updatedBookmarks);
-                   alert(`Successfully imported ${newBookmarks.length} new items.`);
-                   setIsSettingsOpen(false);
-                }
-              } else {
-                alert("Invalid file format.");
+    fileReader.readAsText(file, "UTF-8");
+    fileReader.onload = e => {
+      const content = e.target?.result as string;
+      if (!content) return;
+
+      if (file.name.endsWith('.html')) {
+        // Handle Browser Import (Netscape Bookmark Format)
+        try {
+          const parsed = parseNetscapeBookmarks(content);
+          if (parsed.length > 0) {
+            if (confirm(`Found ${parsed.length} bookmarks from your browser export. Would you like to import them?`)) {
+              const newBookmarksWithIds = parsed.map(b => ({
+                ...b,
+                id: crypto.randomUUID()
+              }));
+              setBookmarks(prev => [...prev, ...newBookmarksWithIds]);
+              alert(`Successfully imported ${parsed.length} bookmarks.`);
+              setIsSettingsOpen(false);
+            }
+          } else {
+            alert("No valid bookmarks found in the HTML file. Make sure it's a standard browser export file.");
+          }
+        } catch (err) {
+          console.error(err);
+          alert("Error parsing the bookmark file.");
+        }
+      } else {
+        // Handle JSON Backup Import
+        try {
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed)) {
+            // Basic validation - check if objects have id and title
+            const isValid = parsed.every(b => b.id && b.title);
+            if (isValid) {
+              if (confirm(`Found ${parsed.length} items in backup. This will merge them with your current ${bookmarks.length} items. Continue?`)) {
+                 const currentIds = new Set(bookmarks.map(b => b.id));
+                 const newBookmarks = parsed.filter(b => !currentIds.has(b.id));
+                 setBookmarks(prev => [...prev, ...newBookmarks]);
+                 alert(`Successfully imported ${newBookmarks.length} new items.`);
+                 setIsSettingsOpen(false);
               }
             } else {
-              alert("Invalid JSON format. Expected an array of bookmarks.");
+              alert("Invalid backup file format.");
             }
-          } catch (err) {
-            console.error(err);
-            alert("Error parsing JSON file.");
+          } else {
+            alert("Invalid JSON format. Expected an array of bookmarks.");
           }
+        } catch (err) {
+          console.error(err);
+          alert("Error parsing JSON file.");
         }
-      };
-    }
+      }
+    };
     if (event.target) event.target.value = '';
   };
 
@@ -794,7 +820,7 @@ function App() {
                           ref={fileInputRef}
                           onChange={handleImportFile}
                           className="hidden"
-                          accept="application/json"
+                          accept="application/json,.html"
                         />
                       </motion.button>
 
