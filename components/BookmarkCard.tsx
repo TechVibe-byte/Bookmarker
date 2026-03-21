@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Trash2, Globe, Edit2, Copy, Check, Share2, GripVertical, Folder, FolderOpen, Sparkles, Loader2 } from 'lucide-react';
+import { ExternalLink, Trash2, Globe, Edit2, Copy, Check, Share2, GripVertical, Folder, FolderOpen } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Bookmark } from '../types';
@@ -11,21 +11,12 @@ interface BookmarkCardProps {
   onDelete: (id: string) => void;
   onEdit: (bookmark: Bookmark) => void;
   onNavigate?: (id: string) => void;
-  onSummarize?: (bookmark: Bookmark) => void;
   isDragOverlay?: boolean;
 }
 
-const BookmarkCard: React.FC<BookmarkCardProps> = ({ 
-  bookmark, 
-  onDelete, 
-  onEdit, 
-  onNavigate, 
-  onSummarize,
-  isDragOverlay = false 
-}) => {
+const BookmarkCard: React.FC<BookmarkCardProps> = ({ bookmark, onDelete, onEdit, onNavigate, isDragOverlay = false }) => {
   const [imageError, setImageError] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isSummarizing, setIsSummarizing] = useState(false);
   const isFolder = bookmark.type === 'folder';
 
   // dnd-kit hook
@@ -228,13 +219,6 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({
                 <p className="text-xs text-gray-500 dark:text-gray-500 truncate">
                   {bookmark.domain}
                 </p>
-                {bookmark.summary && (
-                  <div className="mt-2 p-2 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
-                    <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed italic">
-                      "{bookmark.summary}"
-                    </p>
-                  </div>
-                )}
               </>
             )}
             {isFolder && (
@@ -244,32 +228,7 @@ const BookmarkCard: React.FC<BookmarkCardProps> = ({
             )}
           </div>
 
-          <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center">
-            {!isFolder && onSummarize && !bookmark.summary && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                disabled={isSummarizing}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  setIsSummarizing(true);
-                  try {
-                    await onSummarize(bookmark);
-                  } finally {
-                    setIsSummarizing(false);
-                  }
-                }}
-                className="flex items-center space-x-1 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
-              >
-                {isSummarizing ? (
-                  <Loader2 size={10} className="animate-spin" />
-                ) : (
-                  <Sparkles size={10} />
-                )}
-                <span>{isSummarizing ? 'Summarizing...' : 'Summarize'}</span>
-              </motion.button>
-            )}
-            <div className="flex-grow" />
+          <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-800 flex justify-end">
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Moon, Sun, BookMarked, LayoutGrid, ArrowUpDown, ChevronDown, Settings, Download, Upload, Trash2, X, AlertTriangle, WifiOff, Smartphone, Home, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Plus, Moon, Sun, BookMarked, LayoutGrid, ArrowUpDown, ChevronDown, Settings, Download, Upload, Trash2, X, AlertTriangle, WifiOff, Smartphone, Home, ChevronRight } from 'lucide-react';
 import { 
   DndContext, 
   closestCenter, 
@@ -20,34 +20,12 @@ import {
   rectSortingStrategy 
 } from '@dnd-kit/sortable';
 
-import { Bookmark, CategoryType, Theme, UserProfile } from './types';
+import { Bookmark, CategoryType, Theme } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import CategoryTabs from './components/CategoryTabs';
 import BookmarkCard from './components/BookmarkCard';
 import AddBookmarkForm from './components/AddBookmarkForm';
 import { parseNetscapeBookmarks } from './utils/helpers';
-import { 
-  auth, 
-  db, 
-  googleProvider, 
-  signInWithPopup, 
-  signOut, 
-  onAuthStateChanged, 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
-  addDoc,
-  handleFirestoreError,
-  OperationType,
-  User
-} from './firebase';
-import { GoogleGenAI } from "@google/genai";
 
 const CATEGORIES: CategoryType[] = [
   'All Bookmarks',
@@ -69,9 +47,7 @@ interface BeforeInstallPromptEvent extends Event {
 
 function App() {
   const [theme, setTheme] = useLocalStorage<Theme>('bookmarker-theme', 'dark');
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [bookmarks, setBookmarks] = useLocalStorage<Bookmark[]>('bookmarker-data', []);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('All Bookmarks');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -189,91 +165,24 @@ function App() {
     setIsModalOpen(true);
   };
 
-  // Firebase Auth Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setIsAuthReady(true);
-      
-      if (currentUser) {
-        // Save user profile to Firestore
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          const newUser: UserProfile = {
-            uid: currentUser.uid,
-            email: currentUser.email || '',
-            displayName: currentUser.displayName || '',
-            photoURL: currentUser.photoURL || '',
-            createdAt: Date.now(),
-          };
-          await setDoc(userRef, newUser);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Firestore Sync Listener
-  useEffect(() => {
-    if (!user) {
-      setBookmarks([]);
-      return;
+  const handleSaveBookmark = (bookmarkData: Omit<Bookmark, 'id' | 'createdAt'>) => {
+    if (editingBookmark) {
+      // Update existing
+      setBookmarks(prev => prev.map(b => 
+        b.id === editingBookmark.id 
+          ? { ...b, ...bookmarkData } 
+          : b
+      ));
+    } else {
+      // Add new
+      const newBookmark: Bookmark = {
+        ...bookmarkData,
+        id: crypto.randomUUID(),
+        parentId: currentFolderId, // New items go to current folder
+        createdAt: Date.now(),
+      };
+      setBookmarks(prev => [newBookmark, ...prev]);
     }
-
-    const q = query(collection(db, 'bookmarks'), where('uid', '==', user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items: Bookmark[] = [];
-      snapshot.forEach((doc) => {
-        items.push({ ...doc.data() as Bookmark, id: doc.id });
-      });
-      // Sort by createdAt desc by default
-      setBookmarks(items.sort((a, b) => b.createdAt - a.createdAt));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'bookmarks');
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error('Login error:', error);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const handleSaveBookmark = async (bookmarkData: Omit<Bookmark, 'id' | 'createdAt'>) => {
-    if (!user) {
-      alert('Please login to save bookmarks');
-      return;
-    }
-
-    try {
-      if (editingBookmark) {
-        const bookmarkRef = doc(db, 'bookmarks', editingBookmark.id);
-        await updateDoc(bookmarkRef, { ...bookmarkData });
-      } else {
-        const newBookmark = {
-          ...bookmarkData,
-          uid: user.uid,
-          createdAt: Date.now(),
-        };
-        await addDoc(collection(db, 'bookmarks'), newBookmark);
-      }
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'bookmarks');
-    }
-    
     setIsModalOpen(false);
     setEditingBookmark(null);
   };
@@ -282,48 +191,21 @@ function App() {
     setItemToDelete(id);
   };
 
-  const confirmDelete = async () => {
-    if (itemToDelete && user) {
-      try {
-        // Recursively find all children IDs to delete
-        const idsToDelete = new Set<string>();
-        const findChildren = (parentId: string) => {
-          idsToDelete.add(parentId);
-          bookmarks
-            .filter(b => b.parentId === parentId)
-            .forEach(child => findChildren(child.id));
-        };
-        
-        findChildren(itemToDelete);
-        
-        for (const id of idsToDelete) {
-          await deleteDoc(doc(db, 'bookmarks', id));
-        }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, 'bookmarks');
-      }
-      setItemToDelete(null);
-    }
-  };
-
-  const handleSummarize = async (bookmark: Bookmark) => {
-    if (!bookmark.url) return;
-    
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Summarize this website in 2-3 short sentences: ${bookmark.url}`,
-      });
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      // Recursively find all children IDs to delete
+      const idsToDelete = new Set<string>();
+      const findChildren = (parentId: string) => {
+        idsToDelete.add(parentId);
+        bookmarks
+          .filter(b => b.parentId === parentId)
+          .forEach(child => findChildren(child.id));
+      };
       
-      const summary = response.text;
-      if (summary) {
-        const bookmarkRef = doc(db, 'bookmarks', bookmark.id);
-        await updateDoc(bookmarkRef, { summary });
-      }
-    } catch (error) {
-      console.error('Summarization error:', error);
-      alert('Failed to generate summary. Please try again later.');
+      findChildren(itemToDelete);
+      
+      setBookmarks(prev => prev.filter(b => !idsToDelete.has(b.id)));
+      setItemToDelete(null);
     }
   };
 
@@ -383,22 +265,13 @@ function App() {
           const parsed = parseNetscapeBookmarks(content);
           if (parsed.length > 0) {
             if (confirm(`Found ${parsed.length} bookmarks from your browser export. Would you like to import them?`)) {
-              const importPromises = parsed.map(b => {
-                const newBookmark = {
-                  ...b,
-                  uid: user.uid,
-                  createdAt: Date.now(),
-                };
-                return addDoc(collection(db, 'bookmarks'), newBookmark);
-              });
-              
-              Promise.all(importPromises).then(() => {
-                alert(`Successfully imported ${parsed.length} bookmarks.`);
-                setIsSettingsOpen(false);
-              }).catch(err => {
-                console.error('Import error:', err);
-                alert('Failed to import some bookmarks.');
-              });
+              const newBookmarksWithIds = parsed.map(b => ({
+                ...b,
+                id: crypto.randomUUID()
+              }));
+              setBookmarks(prev => [...prev, ...newBookmarksWithIds]);
+              alert(`Successfully imported ${parsed.length} bookmarks.`);
+              setIsSettingsOpen(false);
             }
           } else {
             alert("No valid bookmarks found in the HTML file. Make sure it's a standard browser export file.");
@@ -412,27 +285,15 @@ function App() {
         try {
           const parsed = JSON.parse(content);
           if (Array.isArray(parsed)) {
-            // Basic validation - check if objects have title
-            const isValid = parsed.every(b => b.title);
+            // Basic validation - check if objects have id and title
+            const isValid = parsed.every(b => b.id && b.title);
             if (isValid) {
-              if (confirm(`Found ${parsed.length} items in backup. This will merge them with your current collection. Continue?`)) {
-                 const importPromises = parsed.map(b => {
-                   const { id, ...rest } = b; // Strip old ID
-                   const newBookmark = {
-                     ...rest,
-                     uid: user.uid,
-                     createdAt: b.createdAt || Date.now(),
-                   };
-                   return addDoc(collection(db, 'bookmarks'), newBookmark);
-                 });
-
-                 Promise.all(importPromises).then(() => {
-                   alert(`Successfully imported ${parsed.length} items.`);
-                   setIsSettingsOpen(false);
-                 }).catch(err => {
-                   console.error('Import error:', err);
-                   alert('Failed to import some items.');
-                 });
+              if (confirm(`Found ${parsed.length} items in backup. This will merge them with your current ${bookmarks.length} items. Continue?`)) {
+                 const currentIds = new Set(bookmarks.map(b => b.id));
+                 const newBookmarks = parsed.filter(b => !currentIds.has(b.id));
+                 setBookmarks(prev => [...prev, ...newBookmarks]);
+                 alert(`Successfully imported ${newBookmarks.length} new items.`);
+                 setIsSettingsOpen(false);
               }
             } else {
               alert("Invalid backup file format.");
@@ -449,17 +310,10 @@ function App() {
     if (event.target) event.target.value = '';
   };
 
-  const handleClearAll = async () => {
-    if (!user) return;
-    if (confirm("WARNING: This will permanently delete ALL your bookmarks from the cloud. This action cannot be undone. Are you absolutely sure?")) {
-      try {
-        const deletePromises = bookmarks.map(b => deleteDoc(doc(db, 'bookmarks', b.id)));
-        await Promise.all(deletePromises);
-        alert('All bookmarks cleared.');
-        setIsSettingsOpen(false);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, 'bookmarks');
-      }
+  const handleClearAll = () => {
+    if (confirm("WARNING: This will permanently delete ALL your bookmarks. This action cannot be undone. Are you absolutely sure?")) {
+      setBookmarks([]);
+      setIsSettingsOpen(false);
     }
   };
 
@@ -568,38 +422,6 @@ function App() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {user ? (
-              <div className="flex items-center gap-2 mr-2">
-                <img 
-                  src={user.photoURL || ''} 
-                  alt={user.displayName || ''} 
-                  className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700"
-                />
-                <div className="hidden sm:block">
-                  <p className="text-xs font-medium text-gray-900 dark:text-white truncate max-w-[100px]">
-                    {user.displayName}
-                  </p>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleLogout}
-                  className="text-[10px] font-medium text-red-600 dark:text-red-400 hover:underline"
-                >
-                  Logout
-                </motion.button>
-              </div>
-            ) : (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogin}
-                className="px-3 py-1.5 rounded-full bg-indigo-600 text-white text-xs font-medium shadow-sm mr-2"
-              >
-                Login
-              </motion.button>
-            )}
-            
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
@@ -753,30 +575,7 @@ function App() {
         style={{ touchAction: 'pan-y' }}
       >
          <div className="max-w-7xl mx-auto min-h-full">
-            {!isAuthReady ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center mt-10">
-                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-                <p className="text-sm text-gray-500">Loading your collection...</p>
-              </div>
-            ) : !user ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center mt-10">
-                <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mb-4">
-                  <BookMarked className="w-8 h-8 text-indigo-400 opacity-75" />
-                </div>
-                <h3 className="text-lg font-normal text-gray-900 dark:text-white mb-1">Welcome to Bookmarker</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs mb-6">
-                  Login to sync your bookmarks across all your devices and access AI features.
-                </p>
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleLogin}
-                  className="px-6 py-2 rounded-full bg-indigo-600 text-white font-medium text-sm shadow-md"
-                >
-                  Login with Google
-                </motion.button>
-              </div>
-            ) : bookmarks.length === 0 ? (
+            {bookmarks.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center mt-10">
               <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mb-4">
                 <LayoutGrid className="w-8 h-8 text-indigo-400 opacity-75" />
@@ -834,7 +633,6 @@ function App() {
                         onDelete={handleDeleteClick} 
                         onEdit={openEditModal}
                         onNavigate={handleNavigate}
-                        onSummarize={handleSummarize}
                       />
                     ))}
                   </AnimatePresence>

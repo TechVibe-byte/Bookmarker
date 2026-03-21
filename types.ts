@@ -7,16 +7,6 @@ export interface Bookmark {
   parentId?: string | null;
   category: CategoryType;
   createdAt: number;
-  summary?: string;
-  uid?: string;
-}
-
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  photoURL: string;
-  createdAt: number;
 }
 
 export type CategoryType = 
