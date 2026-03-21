@@ -1,0 +1,14 @@
+/* Global scroll behavior optimization */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* Ensure smooth momentum scrolling on iOS */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent layout shifts when scrollbars appear/disappear */
+.scrollbar-stable {
+  scrollbar-gutter: stable;
+}

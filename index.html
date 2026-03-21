@@ -83,9 +83,9 @@
         height: 100%;
         width: 100%;
         overflow: hidden; /* Prevent body scroll, we scroll internal div */
-        touch-action: none; /* Disable default touch actions to prevent bounce on body */
+        touch-action: pan-y pinch-zoom; /* Allow vertical panning and zooming */
+        overscroll-behavior: none; /* Prevent bounce on body */
         font-family: 'Roboto', sans-serif;
-        scroll-behavior: smooth;
       }
       
       body {

@@ -545,8 +545,7 @@ function App() {
 
       {/* Scrollable Main Content */}
       <div 
-        className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:px-6 lg:px-8 pb-24 sm:pb-8 scroll-smooth"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:px-6 lg:px-8 pb-24 sm:pb-8 scroll-smooth scrollbar-stable"
       >
          <div className="max-w-7xl mx-auto min-h-full">
             {bookmarks.length === 0 ? (
